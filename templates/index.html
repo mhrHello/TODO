@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TODO - {{ selected_date }}</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; }
+        h1, h2 { text-align: center; }
+        .date-navigation { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .date-navigation a { text-decoration: none; padding: 5px 10px; border: 1px solid #ccc; border-radius: 5px; color: #333; }
+        .date-display { font-size: 1.5em; font-weight: bold; }
+        .todo-section, .diary-section { border: 1px solid #eee; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+        .todo-item { display: flex; align-items: flex-start; margin-bottom: 10px; padding: 8px; border-bottom: 1px dashed #eee; }
+        .todo-item:last-child { border-bottom: none; }
+        .todo-item input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); }
+        .todo-content { flex-grow: 1; }
+        .todo-description-toggle { cursor: pointer; text-decoration: underline; font-size: 0.9em; color: #666; margin-top: 5px; display: block; }
+        .todo-description-area { display: none; margin-top: 5px; width: 100%; min-height: 60px; padding: 5px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .todo-actions { margin-left: 20px; }
+        .todo-actions button { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 0.9em; }
+        .add-todo-form input[type="text"] { width: calc(100% - 80px); padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .add-todo-form button { padding: 8px 15px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        /* .diary-content textarea { width: 100%; min-height: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .save-button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+ */
+
+        /* ★追加・修正：新しい textarea のスタイル */
+        #diary-content-textarea {
+            display: block; /* ブロック要素にして、ボタンが下に配置されるようにする */
+            width: 100%; /* 親要素の幅いっぱいに広がるように設定 */
+            max-width: 760px; /* PCでの最大幅を制限 (例: mainコンテンツの幅 - 40px) */
+            min-height: 200px; /* 初期表示の高さ */
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box; /* paddingやborderをwidthに含める */
+            margin-bottom: 10px; /* ボタンとの間に余白を作る */
+            resize: vertical; /* 縦方向のみリサイズ可能にする */
+        }
+
+        .save-button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            /* margin-top: 10px; <- ここは不要になる */
+            display: block; /* ボタンをブロック要素にして、textareaの下に配置 */
+            width: fit-content; /* ボタンの幅はコンテンツに合わせる */
+            margin-left: auto; /* 右寄せにしたい場合 */
+            margin-right: auto; /* 中央寄せにしたい場合 */
+            /* 両方をautoにすると中央寄せになります */
+        }
+
+        /* ★追加：レスポンシブデザイン (スマホ向け調整) */
+        @media (max-width: 600px) { /* 画面幅が600px以下の場合に適用されるスタイル */
+            body {
+                padding: 0 10px; /* スマホでは左右の余白を減らす */
+            }
+
+            #diary-content-textarea {
+                min-height: 150px; /* スマホでは高さを少し抑える */
+                max-width: 100%; /* スマホでは最大幅を親要素に合わせる */
+            }
+
+            .save-button {
+                width: 100%; /* スマホではボタンを幅いっぱいに広げる */
+            }
+        }
+
+        .todo-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px;
+            padding: 8px;
+            border-bottom: 1px dashed #eee;
+        }
+        .todo-item input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+            /* クリック時に少し不透明度を下げるなど視覚的なフィードバック */
+            transition: opacity 0.2s ease-in-out;
+        }
+        .todo-item input[type="checkbox"]:disabled {
+            opacity: 0.6; /* 無効化されたら少し薄くする */
+            cursor: not-allowed; /* カーソルも変更 */
+        }
+        .todo-content .task-text { /* ★追加：タスクテキスト用のクラス */
+            /* 元々 style 属性で指定していた line-through をここに移動 */
+            text-decoration: none; /* デフォルトは横線なし */
+            transition: text-decoration 0.2s ease-in-out; /* スムーズな切り替え */
+        }
+
+        .todo-content .task-text.completed { /* ★追加：完了時のクラス */
+            text-decoration: line-through;
+        }
+    </style>
+</head>
+<body>
+    <div style="text-align: right; margin-bottom: 10px;">
+        {% if current_user.is_authenticated %}
+            <span>Hello, {{ current_user.username }}!</span> | <a href="{{ url_for('logout') }}">ログアウト</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">ログイン</a> | <a href="{{ url_for('register') }}">新規登録</a>
+        {% endif %}
+    </div>
+    <h1>TODO</h1>
+
+     <div class="date-navigation">
+        <a href="{{ url_for('show_day', selected_date=prev_date) }}">&lt; 前の日</a>
+        <span class="date-display">{{ selected_date }}</span>
+        <a href="{{ url_for('show_day', selected_date=next_date) }}">次の日 &gt;</a>
+    </div>
+
+    <div class="copy-button-container">
+        <form action="{{ url_for('copy_yesterday_todos', selected_date=selected_date) }}" method="post">
+            <button type="submit" class="copy-button" onclick="return confirm('昨日のTODOを今日のリストにコピーしますか？');">
+                昨日のTODOをコピー
+            </button>
+        </form>
+    </div>
+
+    <div class="todo-section">
+        <h2>今日のTODO</h2>
+        <form class="add-todo-form" action="{{ url_for('add_todo', selected_date=selected_date) }}" method="post">
+            <input type="text" name="task" placeholder="新しいTODOを追加" required>
+            <button type="submit">追加</button>
+        </form>
+
+        <ul>
+            {% for todo in todos %}
+            <li class="todo-item">
+                <form action="{{ url_for('update_todo_status', todo_id=todo.id) }}" method="post">
+                    <input type="checkbox"
+                           id="todo-checkbox-{{ todo.id }}" {# ★追加：id 属性 #}
+                           {% if todo.status == 'completed' %}checked{% endif %}
+                           onchange="toggleTodoCompletion(this, {{ todo.id }})"> {# ここは変わらず #}
+                    {# ★変更：status 送信用の hidden input を追加 #}
+                    <input type="hidden" name="status" id="hidden-status-{{ todo.id }}" value="{{ todo.status }}">
+                </form>
+                <div class="todo-content">
+                    <span class="task-text {% if todo.status == 'completed' %}completed{% endif %}">{{ todo.task }}</span>
+                    <span class="todo-description-toggle" onclick="toggleDescription(this)">詳細を{{ '表示' if not todo.description else '編集' }}</span>
+                    <form action="{{ url_for('update_todo_description', todo_id=todo.id) }}" method="post" style="display: {{ 'block' if todo.description else 'none' }}" class="todo-description-form">
+                        <textarea name="description" class="todo-description-area" placeholder="顛末などを記述">{{ todo.description if todo.description else '' }}</textarea>
+                        <button type="submit" class="save-button">詳細保存</button>
+                    </form>
+                </div>
+                <div class="todo-actions">
+                    <form action="{{ url_for('delete_todo', todo_id=todo.id) }}" method="post" onsubmit="return confirm('このTODOを削除しますか？');">
+                        <button type="submit">削除</button>
+                    </form>
+                </div>
+            </li>
+            {% else %}
+            <li>今日のTODOはありません。</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+
+    <div class="diary-section">
+        <h2>Diary</h2>
+        <form action="{{ url_for('update_diary', selected_date=selected_date) }}" method="post">
+            <textarea name="content" id="diary-content-textarea" placeholder="今日あったことや感じたことを自由に書きましょう。">{{ diary.content if diary else '' }}</textarea>
+            <button type="submit" class="save-button">日記を保存</button>
+        </form>
+    </div>
+
+    <script>
+        // 日付文字列をDateオブジェクトに変換し、前日/翌日を取得するためのカスタムフィルター
+        // Jinja2のテンプレート内でPythonのdatetimeオブジェクトを直接操作できないため、
+        // 簡易的な関数をJavaScript側で定義するか、Python側で日付操作を行う必要があります。
+        // ここではJinja2のカスタムフィルター（Python側で実装）と連携させます。
+        // Flaskでカスタムフィルターを登録する方法は別途説明します。
+        // 一時的に、ここではprev_day/next_dayはPython側で計算しています。
+        // もしくは、JavaScriptで直接日付計算することも可能です。
+        // 例:
+        function getRelativeDate(dateStr, days) {
+            const date = new Date(dateStr + 'T00:00:00'); // UTCとして解釈されるのを防ぐため時間を指定
+            date.setDate(date.getDate() + days);
+            return date.toISOString().split('T')[0];
+        }
+
+        function toggleTodoCompletion(checkbox, todoId) {
+            checkbox.disabled = true; // チェックボックスを無効化
+
+            const form = checkbox.form;
+            const taskTextElement = checkbox.closest('.todo-item').querySelector('.task-text');
+            const hiddenStatusInput = document.getElementById(`hidden-status-${todoId}`); // ★追加：隠しフィールドを取得
+
+            // ★変更：隠しフィールドの値を更新
+            const newStatus = checkbox.checked ? 'completed' : 'pending';
+            hiddenStatusInput.value = newStatus;
+
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form) // フォームデータを送信
+            })
+            .then(response => {
+                if (response.ok) {
+                    if (checkbox.checked) {
+                        taskTextElement.classList.add('completed');
+                    } else {
+                        taskTextElement.classList.remove('completed');
+                    }
+
+                    // description フォームを隠すロジックはそのまま
+                    if (!checkbox.checked) {
+                        const descriptionForm = checkbox.closest('.todo-item').querySelector('.todo-description-form');
+                        if (descriptionForm) {
+                            descriptionForm.style.display = 'none';
+                        }
+                    }
+
+                } else {
+                    console.error('TODOステータスの更新に失敗しました。');
+                    alert('TODOステータスの更新に失敗しました。');
+                    checkbox.checked = !checkbox.checked; // 元の状態に戻す
+                    // エラー時は隠しフィールドの値も元に戻す
+                    hiddenStatusInput.value = checkbox.checked ? 'completed' : 'pending';
+                }
+            })
+            .catch(error => {
+                console.error('ネットワークエラー:', error);
+                alert('ネットワークエラーが発生しました。');
+                checkbox.checked = !checkbox.checked; // 元の状態に戻す
+                hiddenStatusInput.value = checkbox.checked ? 'completed' : 'pending';
+            })
+            .finally(() => {
+                checkbox.disabled = false; // 無効化を解除
+            });
+        }
+
+        function toggleDescription(element) {
+            const form = element.nextElementSibling;
+            if (form.style.display === 'none' || form.style.display === '') {
+                form.style.display = 'block';
+            } else {
+                form.style.display = 'none';
+            }
+        }
+        function submitTodoStatus(checkbox) {
+        // フォームを送信する前に、一時的にチェックボックスを無効化する
+            checkbox.disabled = true;
+            checkbox.form.submit();
+        }
+    </script>
+</body>
+</html>
