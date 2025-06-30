@@ -4,7 +4,6 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_bcrypt import Bcrypt # Bcrypt を追加
 import os
 from datetime import date, timedelta, datetime
-
 # アプリケーションの初期化
 app = Flask(__name__)
 
@@ -15,6 +14,7 @@ app.config['SECRET_KEY'] = '4bcec385ac09f1ff296059e6bf48e1e727a4446cb1ec0fe9' # 
 # SQLiteを使うローカル開発用
 basedir = os.path.abspath(os.path.dirname(__file__))
 sqlite_uri = 'postgresql://todo_db_bnxt_user:RLfDyZhLN4KH6QXkNWH1fIPPtjviSJar@dpg-d1h9foali9vc73bgs3ig-a.singapore-postgres.render.com/todo_db_bnxt' + os.path.join(basedir, 'site.db')
+
 
 # Renderなどの本番環境では環境変数からDATABASE_URLを読み込む
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', sqlite_uri)
@@ -270,6 +270,9 @@ def logout():
     logout_user()
     flash('ログアウトしました。', 'info')
     return redirect(url_for('login')) # ログアウト後はログインページへリダイレクト
+
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
     app.run(debug=True)
