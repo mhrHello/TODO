@@ -9,11 +9,15 @@ from datetime import date, timedelta, datetime
 app = Flask(__name__)
 
 # ★追加：シークレットキーの設定 (本番環境ではもっと複雑なキーにしてください)
-app.config['SECRET_KEY'] = 'your_secret_key_here' # ここをユニークな文字列に変更してください
+app.config['SECRET_KEY'] = '4bcec385ac09f1ff296059e6bf48e1e727a4446cb1ec0fe9' # ここをユニークな文字列に変更してください
 
 # データベース設定
+# SQLiteを使うローカル開発用
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'site.db')
+sqlite_uri = 'postgresql://todo_db_bnxt_user:RLfDyZhLN4KH6QXkNWH1fIPPtjviSJar@dpg-d1h9foali9vc73bgs3ig-a.singapore-postgres.render.com/todo_db_bnxt' + os.path.join(basedir, 'site.db')
+
+# Renderなどの本番環境では環境変数からDATABASE_URLを読み込む
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', sqlite_uri)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
